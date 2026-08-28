@@ -1,28 +1,29 @@
 require('dotenv').config();
 
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'CHANGE_THIS_TO_A_LONG_RANDOM_SECRET') {
-    console.error('❌ กรุณาตั้งค่า JWT_SECRET ในไฟล์ .env ให้เป็นค่าสุ่มที่ปลอดภัยก่อนรันระบบ');
-    // ลบ process.exit(1) ออกเพื่อป้องกัน Serverless ค้างพัง
-}
-
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { initDatabase } = require('./db/database');
+
+// 🟢 แก้ไข Path การอ้างอิงไฟล์ db (ปรับให้ตรงตามโครงสร้างไฟล์ของคุณ เช่น ./db หรือ ../db)
+let initDatabase;
+try {
+    initDatabase = require('./db').initDatabase;
+} catch (e) {
+    initDatabase = require('./db/database').initDatabase;
+}
 
 const authRoutes = require('./routes/auth.routes');
 const layoutRoutes = require('./routes/layout.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const settingsRoutes = require('./routes/settings.routes');
-// 🟢 1. เพิ่มการ Import content.routes
 const contentRoutes = require('./routes/content.routes');
 
 const app = express();
 
 app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' } // ให้ frontend คนละ origin โหลดรูปสลิป/รูปเมนูได้
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
 app.use(cors({
@@ -32,34 +33,45 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb' }));
 
-// จำกัด request รวมทั้งระบบกันโดน spam/DoS แบบง่ายๆ
 app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }));
 
-// เสิร์ฟไฟล์รูปที่อัปโหลด (สลิปโอนเงิน / รูปเมนูอาหาร)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Middleware ตรวจสอบและรันการเริ่มสร้างฐานข้อมูล Turso ก่อนรับ Request เสมอ
+let isDbReady = false;
+let dbInitPromise = null;
+
+app.use(async (req, res, next) => {
+    if (!isDbReady) {
+        try {
+            if (!dbInitPromise) {
+                dbInitPromise = initDatabase();
+            }
+            await dbInitPromise;
+            isDbReady = true;
+        } catch (err) {
+            console.error('❌ DB Init Error:', err.message);
+            return res.status(500).json({ error: 'Database Connection Error: ' + err.message });
+        }
+    }
+    next();
+});
+
+// เสิร์ฟไฟล์อัปโหลด
+app.use('/uploads', express.static(path.join(process.cwd(), 'backend/uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/layout', layoutRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/settings', settingsRoutes);
-// 🟢 2. เปิดใช้งาน Route /api/content
 app.use('/api/content', contentRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// error handler กลาง กันหลุด stack trace ไปให้ client เห็น
+// Centralized error handler
 app.use((err, req, res, next) => {
     console.error(err);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์' });
+    res.status(500).json({ error: err.message || 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์' });
 });
 
-// 🟢 เรียกเชื่อมต่อฐานข้อมูล Turso แบบไม่บล็อก Vercel Serverless
-initDatabase().catch(err => {
-    console.error('❌ เชื่อมต่อฐานข้อมูล Turso ไม่สำเร็จ:', err.message);
-    console.error('   ตรวจสอบว่าตั้งค่า TURSO_DATABASE_URL และ TURSO_AUTH_TOKEN ใน .env ถูกต้องหรือไม่');
-});
-
-// 🟢 หากรันในเครื่อง (Local) ให้สั่งเปิด Port 3000 ตามปกติ
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => console.log(`✅ Backend running on http://localhost:${PORT}`));
