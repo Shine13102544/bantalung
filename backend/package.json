@@ -1,27 +1,16 @@
 {
-  "name": "bantalung-booking-backend",
+  "name": "bantalung",
   "version": "1.0.0",
-  "description": "Backend API สำหรับระบบจองโต๊ะคอนเสิร์ต ร้านบ้านตะลุง",
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "seed:admin": "node seed-admin.js"
+    "start": "node backend/server.js"
   },
   "dependencies": {
-    "@libsql/client": "^0.14.0",
+    "@libsql/client": "^0.6.0",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
-    "cloudinary": "^2.5.1",
-    "multer-storage-cloudinary": "^4.0.0",
     "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "express": "^4.19.2",
-    "express-rate-limit": "^7.4.0",
-    "express-validator": "^7.2.0",
-    "sanitize-html": "^2.13.0",
     "dotenv": "^16.4.5",
-    "uuid": "^9.0.1"
+    "express": "^4.19.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2"
   }
 }
