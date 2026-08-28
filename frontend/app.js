@@ -47,9 +47,10 @@ window.getDynamicPrice = function(tablesString) {
 // ==========================================================
 // เปลี่ยนจากเดิม: const API_URL = 'http://localhost:3000/api';
 // เป็นการเช็คสภาพแวดล้อมอัตโนมัติ:
+// กำหนด URL ของ API ให้ถูกต้อง
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3000/api'
-  : '/api';
+  ? 'http://localhost:3000'
+  : '';
 const TOKEN_KEY = 'bantalung_admin_token';
 const getToken = () => localStorage.getItem(TOKEN_KEY);
 const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
