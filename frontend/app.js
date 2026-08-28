@@ -45,9 +45,9 @@ window.getDynamicPrice = function(tablesString) {
 // ถ้ารัน frontend คนละ origin กับ backend ให้แก้ค่านี้ เช่น 'http://localhost:3000'
 // ถ้าเสิร์ฟจากเซิร์ฟเวอร์เดียวกัน (proxy/same domain) ปล่อยเป็นค่าว่างได้เลย
 // ==========================================================
-const API_BASE = window.location.hostname === 'localhost'
-    ? 'http://localhost:3000/api'
-    : '/api';
+const API_BASE = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : '';
 const TOKEN_KEY = 'bantalung_admin_token';
 const getToken = () => localStorage.getItem(TOKEN_KEY);
 const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
