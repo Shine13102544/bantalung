@@ -64,3 +64,4 @@ initDatabase()
         console.error('   ตรวจสอบว่าตั้งค่า TURSO_DATABASE_URL และ TURSO_AUTH_TOKEN ใน .env ถูกต้องหรือไม่');
         process.exit(1);
     });
+    module.exports = app;
