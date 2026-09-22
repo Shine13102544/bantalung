@@ -2014,7 +2014,120 @@ function renderInspectLayout() {
             el.style.display = 'flex'; el.style.flexDirection = 'column';
             el.style.alignItems = 'center'; el.style.justifyContent = 'center';
             el.style.cursor = 'pointer'; el.style.zIndex = '10'; el.style.padding = '2px';
+              // 🖱️ ข้อมูลสำหรับระบบ Hover โต๊ะ
+el.dataset.inspectTableCode = code;
 
+if (booking) {
+    // โต๊ะทั้งหมดที่อยู่ในการจองเดียวกัน
+    const relatedTables = String(booking.tables || '')
+        .split(',')
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    // เก็บขอบเดิมไว้
+    el._originalBoxShadow = el.style.boxShadow || '';
+
+    el.addEventListener('mouseenter', () => {
+
+        // 🔵 เน้นโต๊ะทั้งหมดที่เป็นของผู้จองคนเดียวกัน
+        const allTableEls = canvas.querySelectorAll(
+            '[data-inspect-table-code]'
+        );
+
+        allTableEls.forEach(tableEl => {
+            const tableCode = tableEl.dataset.inspectTableCode;
+
+            if (relatedTables.includes(tableCode)) {
+                tableEl.style.boxShadow =
+                    '0 0 0 3px #3498db, 0 0 14px rgba(52, 152, 219, 0.8)';
+                tableEl.style.zIndex = '50';
+            }
+        });
+
+        // 🪪 สร้างกล่องข้อมูล
+        let info = document.getElementById('inspect-hover-info');
+
+        if (!info) {
+            info = document.createElement('div');
+            info.id = 'inspect-hover-info';
+
+            info.style.position = 'absolute';
+           info.style.zIndex = '9999';
+info.style.pointerEvents = 'none';
+            info.style.background = 'rgba(20, 20, 20, 0.96)';
+            info.style.color = '#fff';
+            info.style.padding = '10px 14px';
+            info.style.borderRadius = '10px';
+            info.style.border = '2px solid #3498db';
+            info.style.boxShadow = '0 5px 20px rgba(0,0,0,0.45)';
+            info.style.fontSize = '13px';
+            info.style.lineHeight = '1.5';
+            info.style.pointerEvents = 'none';
+            info.style.whiteSpace = 'nowrap';
+
+            canvas.appendChild(info);
+        }
+
+        const custName =
+            `${booking.first_name || ''} ${booking.last_name || ''}`
+                .trim() || 'ไม่ระบุชื่อ';
+
+        const custPhone = booking.phone || '-';
+
+        info.innerHTML = `
+            <div style="font-weight:bold;color:#3498db;font-size:15px;">
+                👤 ${escapeHtml(custName)}
+            </div>
+            <div>
+                📞 ${escapeHtml(custPhone)}
+            </div>
+            <div>
+                🪑 จอง ${relatedTables.length} โต๊ะ:
+                <b>${escapeHtml(relatedTables.join(', '))}</b>
+            </div>
+        `;
+
+        // วางกล่องไว้เหนือโต๊ะที่เอาเมาส์จ่อ
+        info.style.display = 'block';
+
+        const left =
+            el.offsetLeft +
+            (el.offsetWidth / 2) -
+            100;
+
+        const top =
+            Math.max(
+                5,
+                el.offsetTop - info.offsetHeight - 10
+            );
+
+        info.style.left = `${Math.max(5, left)}px`;
+        info.style.top = `${top}px`;
+    });
+
+    el.addEventListener('mouseleave', () => {
+
+        // เอาขอบสีน้ำเงินออกจากโต๊ะทั้งหมด
+        const allTableEls = canvas.querySelectorAll(
+            '[data-inspect-table-code]'
+        );
+
+        allTableEls.forEach(tableEl => {
+            tableEl.style.boxShadow =
+                tableEl._originalBoxShadow || '';
+
+            tableEl.style.zIndex = '10';
+        });
+
+        // ซ่อนกล่องข้อมูล
+        const info =
+            document.getElementById('inspect-hover-info');
+
+        if (info) {
+            info.style.display = 'none';
+        }
+    });
+}
             const codeSize = isVIP ? '0.62rem' : '0.8rem';
             const statusSize = isVIP ? '0.5rem' : '0.6rem';
 
@@ -2119,42 +2232,203 @@ function closeInspectModal() {
     if (modal) modal.style.display = 'none';
 }
 
-// เปิด Modal แสดงรายละเอียดโต๊ะ/ผู้จอง พร้อมปุ่มเช็กอิน (เรียกจาก inspectSearch หรือจะเรียกตรงก็ได้)
+// เปิด Modal แสดงรายละเอียดโต๊ะ/ผู้จอง
+// รองรับกรณีผู้จองคนเดียวจองหลายโต๊ะ
 function openInspectModalForTable(code) {
-    const data = (typeof layoutData !== 'undefined' && layoutData) ? layoutData : window.layoutData;
-    const item = Array.isArray(data) ? data.find(i => i.kind === 'table' && i.table_code === code) : null;
+    const data = (typeof layoutData !== 'undefined' && layoutData)
+        ? layoutData
+        : window.layoutData;
+
+    const item = Array.isArray(data)
+        ? data.find(i => i.kind === 'table' && i.table_code === code)
+        : null;
+
     const booking = findActiveBookingForTable(code);
 
     const modal = document.getElementById('inspect-detail-modal');
     const body = document.getElementById('inspect-modal-body');
+
     if (!modal || !body) return;
 
-    const isCheckedIn = !!(booking && Number(booking.checked_in) === 1);
-    const custName = booking ? (`${booking.first_name || ''} ${booking.last_name || ''}`.trim() || 'ผู้จอง') : '-';
-    const custPhone = booking ? (booking.phone || '-') : '-';
-    const statusText = isCheckedIn ? 'เข้างานแล้ว' : (booking ? 'จองแล้ว (รอเข้างาน)' : 'ว่าง');
+    if (!booking) {
+        body.innerHTML = `
+            <p><b>โต๊ะ:</b> ${escapeHtml(code)}</p>
+            <p style="color:#e74c3c;">❌ ไม่พบข้อมูลการจอง</p>
+        `;
 
+        modal.style.display = 'flex';
+        return;
+    }
+
+    // ---------------------------------------------------------
+    // ข้อมูลผู้จอง
+    // ---------------------------------------------------------
+    const custName =
+        `${booking.first_name || ''} ${booking.last_name || ''}`.trim()
+        || 'ผู้จอง';
+
+    const custPhone = booking.phone || '-';
+
+    const isCheckedIn =
+        Number(booking.checked_in) === 1;
+
+    const statusText =
+        isCheckedIn
+            ? 'เข้างานแล้ว'
+            : 'จองแล้ว (รอเข้างาน)';
+
+    // ---------------------------------------------------------
+    // ดึงโต๊ะทั้งหมดที่อยู่ในการจองเดียวกัน
+    // เช่น "22,23,24"
+    // ---------------------------------------------------------
+    const allTables = typeof booking.tables === 'string'
+        ? booking.tables
+            .split(',')
+            .map(t => t.trim())
+            .filter(Boolean)
+        : [];
+
+    // ถ้าไม่มีข้อมูล ให้ใช้โต๊ะที่กำลังเปิดอยู่
+    if (!allTables.length) {
+        allTables.push(code);
+    }
+
+    // ---------------------------------------------------------
+    // สร้างปุ่มโต๊ะทั้งหมด
+    // ---------------------------------------------------------
+    const tableButtons = allTables.map(tableCode => {
+        const isCurrent = tableCode === code;
+
+        return `
+            <button
+                type="button"
+                onclick="openInspectModalForTable('${escapeHtml(tableCode)}')"
+                style="
+                    margin:4px;
+                    padding:8px 12px;
+                    border:none;
+                    border-radius:8px;
+                    cursor:pointer;
+                    font-weight:bold;
+                    color:#fff;
+                    background:${isCurrent ? '#3498db' : '#555'};
+                    box-shadow:${isCurrent ? '0 0 0 2px #2980b9' : 'none'};
+                "
+            >
+                🪑 ${escapeHtml(tableCode)}
+                ${isCurrent ? ' ✓' : ''}
+            </button>
+        `;
+    }).join('');
+
+    // ---------------------------------------------------------
+    // แสดงข้อมูล
+    // ---------------------------------------------------------
     body.innerHTML = `
-        <p><b>โต๊ะ:</b> ${escapeHtml(code)}${item ? ` (${escapeHtml(item.zone_type || '')})` : ''}</p>
-        <p><b>ผู้จอง:</b> ${escapeHtml(custName)}</p>
-        <p><b>เบอร์โทร:</b> ${escapeHtml(custPhone)}</p>
-        <p><b>สถานะ:</b> ${escapeHtml(statusText)}</p>
+        <div style="
+            background:#1f1f1f;
+            padding:15px;
+            border-radius:10px;
+            margin-bottom:10px;
+        ">
+            <p>
+                <b>โต๊ะที่เลือก:</b>
+                ${escapeHtml(code)}
+                ${item ? ` (${escapeHtml(item.zone_type || '')})` : ''}
+            </p>
+
+            <p>
+                <b>ผู้จอง:</b>
+                ${escapeHtml(custName)}
+            </p>
+
+            <p>
+                <b>เบอร์โทร:</b>
+                ${escapeHtml(custPhone)}
+            </p>
+
+            <p>
+                <b>สถานะ:</b>
+                ${escapeHtml(statusText)}
+            </p>
+
+            <hr style="
+                border:none;
+                border-top:1px solid #444;
+                margin:12px 0;
+            ">
+
+            <p style="
+                margin-bottom:6px;
+                font-weight:bold;
+                color:#f1c40f;
+            ">
+                🪑 โต๊ะทั้งหมดที่ผู้จองคนนี้จอง
+                (${allTables.length} โต๊ะ)
+            </p>
+
+            <div>
+                ${tableButtons}
+            </div>
+        </div>
     `;
 
-    if (booking) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = isCheckedIn ? '↩️ ยกเลิกการเช็กอิน' : '✅ ยืนยันเช็กอินเข้างาน';
-        btn.style.cssText = 'margin-top:10px;padding:10px 16px;border:none;border-radius:6px;font-weight:bold;cursor:pointer;background:#2ecc71;color:#fff;';
-        btn.onclick = async () => {
-            const ok = await setTableCheckedIn(booking.id, !isCheckedIn);
-            if (!ok) return;
-            closeInspectModal();
-            await refreshInspectView();
-            if (typeof renderBookingTable === 'function') renderBookingTable();
-        };
-        body.appendChild(btn);
-    }
+    // ---------------------------------------------------------
+    // ปุ่มเช็กอิน / ยกเลิกเช็กอิน
+    // ใช้ booking เดิมทั้งหมด
+    // ---------------------------------------------------------
+    const btn = document.createElement('button');
+
+    btn.type = 'button';
+
+    btn.textContent = isCheckedIn
+        ? '↩️ ยกเลิกการเช็กอิน'
+        : '✅ ยืนยันเช็กอินเข้างาน';
+
+    btn.style.cssText = `
+        margin-top:10px;
+        padding:10px 16px;
+        border:none;
+        border-radius:6px;
+        font-weight:bold;
+        cursor:pointer;
+        background:${isCheckedIn ? '#f39c12' : '#2ecc71'};
+        color:#fff;
+        width:100%;
+    `;
+
+    btn.onclick = async () => {
+
+        const actionText = isCheckedIn
+            ? 'ยกเลิกการเช็กอิน'
+            : 'ยืนยันเช็กอินเข้างาน';
+
+        if (!confirm(
+            `👤 ผู้จอง: ${custName}\n` +
+            `📞 เบอร์โทร: ${custPhone}\n` +
+            `🪑 โต๊ะทั้งหมด: ${allTables.join(', ')}\n\n` +
+            `คุณต้องการ "${actionText}" ใช่หรือไม่?`
+        )) {
+            return;
+        }
+
+        const ok = await setTableCheckedIn(
+            booking.id,
+            !isCheckedIn
+        );
+
+        if (!ok) return;
+
+        closeInspectModal();
+
+        await refreshInspectView();
+
+        if (typeof renderBookingTable === 'function') {
+            renderBookingTable();
+        }
+    };
+
+    body.appendChild(btn);
 
     modal.style.display = 'flex';
 }
