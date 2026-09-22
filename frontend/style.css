@@ -962,7 +962,17 @@ button.admin-badge:hover {
   .summary-card { min-width: 105px; padding: 10px 12px; }
   .summary-card .summary-count { font-size: 1.3rem; }
 }
-
+/* ปรับปุ่ม Admin Mode สำหรับมือถือ */
+@media (max-width: 768px) {
+    .admin-badge {
+        top: 8px;
+        right: 8px;
+        padding: 3px 7px;
+        font-size: 0.62rem;
+        border-radius: 10px;
+        line-height: 1.2;
+    }
+}
 
 
 
