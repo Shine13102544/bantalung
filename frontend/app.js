@@ -1200,6 +1200,10 @@ async function renderBookingTable() {
     if (!res.ok) { tbody.innerHTML = ''; return; }
     const bookings = await res.json();
 
+await fetchLayout();
+
+// 🟢 เรียงลำดับตามที่เลือกในช่อง "เรียงตาม"
+
     // 🟢 เรียงลำดับตามที่เลือกในช่อง "เรียงตาม" (ค่าเริ่มต้น = ล่าสุดก่อน ตามที่ backend ส่งมาอยู่แล้ว)
     const sortMode = document.getElementById('booking-sort-order')?.value || 'default';
     if (sortMode === 'table-asc' || sortMode === 'table-desc') {
@@ -1236,36 +1240,27 @@ async function renderBookingTable() {
 
 
 function getDynamicPrice(tablesString) {
-    // ฟังก์ชันดึงเฉพาะตัวเลข (ตัดเครื่องหมาย , และ ฿ ออกให้อัตโนมัติ)
-    const getVal = (id, fallback) => {
-        const el = document.getElementById(id);
-        if (!el || !el.value) return fallback;
-        const num = el.value.toString().replace(/[^0-9]/g, '');
-        return num ? parseFloat(num) : fallback;
-    };
-
-    // 1. ดึงราคาจาก ID จริงบนหน้าเว็บ
-    const vipPrice = getVal('edit-price-vip', 2500);
-    const normalPrice = getVal('edit-price-normal', 1200);
-    const generalPrice = getVal('edit-price-general', 800);
-
-    // 2. ถ้าไม่มีข้อมูลโต๊ะ ให้คิดเป็นราคาโซนทั่วไปขั้นต่ำ 1 โต๊ะ
     if (!tablesString || String(tablesString).trim() === '' || tablesString === 'null') {
-        return generalPrice;
+        return 0;
     }
 
-    // 3. แยกคำนวณราคาตามโซน
-    const tableList = String(tablesString).split(',');
+    const tableList = String(tablesString)
+        .split(',')
+        .map(table => table.trim())
+        .filter(Boolean);
+
     let totalPrice = 0;
 
-    tableList.forEach(table => {
-        const name = table.trim().toUpperCase();
-        if (name.includes('VIP')) {
-            totalPrice += vipPrice;
-        } else if (name.includes('ธรรมดา') || name.startsWith('A') || name.startsWith('B')) {
-            totalPrice += normalPrice;
-        } else {
-            totalPrice += generalPrice;
+    tableList.forEach(tableCode => {
+        const item = Array.isArray(layoutData)
+            ? layoutData.find(i =>
+                i.kind === 'table' &&
+                String(i.table_code) === String(tableCode)
+            )
+            : null;
+
+        if (item) {
+            totalPrice += parsePrice(item.price);
         }
     });
 
