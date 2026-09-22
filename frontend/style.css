@@ -963,7 +963,9 @@ button.admin-badge:hover {
   .summary-card .summary-count { font-size: 1.3rem; }
 }
 /* ปรับปุ่ม Admin Mode สำหรับมือถือ */
+
 @media (max-width: 768px) {
+
     .admin-badge {
         top: 8px;
         right: 8px;
@@ -972,8 +974,13 @@ button.admin-badge:hover {
         border-radius: 10px;
         line-height: 1.2;
     }
-}
 
+    /* ซ่อนคำว่า (เข้าสู่ระบบ) เฉพาะมือถือ */
+    .admin-login-text {
+        display: none;
+    }
+
+}
 
 
 

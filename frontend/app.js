@@ -1299,8 +1299,31 @@ document.getElementById('stat-approved').textContent = `${approved} รายก
 
 // 🟢 ก๊อปปี้ท่อนนี้ไปวางต่อท้ายตรงนี้ได้เลยครับ
 const totalRevenue = bookings.reduce((sum, item) => {
-    const isApproved = item.status === 'approved' || item.status === 'อนุมัติแล้ว' || item.status === 'ยืนยันแล้ว';
-    return isApproved ? sum + getDynamicPrice(item.tables) : sum;
+    const isApproved =
+        item.status === 'approved' ||
+        item.status === 'อนุมัติแล้ว' ||
+        item.status === 'ยืนยันแล้ว';
+
+    if (!isApproved) return sum;
+
+    let bookingTotal = 0;
+
+    const tableList = String(item.tables || '')
+        .split(',')
+        .map(code => code.trim())
+        .filter(Boolean);
+
+    tableList.forEach(code => {
+        const tableItem = layoutData.find(
+            i => i.kind === 'table' && i.table_code === code
+        );
+
+        if (tableItem) {
+            bookingTotal += parsePrice(tableItem.price);
+        }
+    });
+
+    return sum + bookingTotal;
 }, 0);
 
 const revenueEl = document.getElementById('stat-revenue') || document.getElementById('stat-income') || document.getElementById('stat-total-money') || document.getElementById('stat-amount');
