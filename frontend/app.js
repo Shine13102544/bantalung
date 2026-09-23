@@ -308,7 +308,54 @@ async function refreshConcertInfo() {
     if (document.getElementById('edit-price-normal')) document.getElementById('edit-price-normal').value = settings.price_normal || '';
     if (document.getElementById('edit-price-general')) document.getElementById('edit-price-general').value = settings.price_general || '';
 }
+// =====================================================
+// 🚫 ป้องกันการเลือกโต๊ะที่ติดกันในแนวนอน
+// อนุญาตให้เลือกโต๊ะที่อยู่บน-ล่างกันได้
+// =====================================================
+function isHorizontalAdjacentTable(candidateBtn) {
 
+    const candidateRect = candidateBtn.getBoundingClientRect();
+
+    const selectedButtons = document.querySelectorAll(
+    '.table-btn.selected'
+);
+
+    return Array.from(selectedButtons).some(selectedBtn => {
+
+        const selectedRect = selectedBtn.getBoundingClientRect();
+
+        // ตรวจว่ามีการซ้อนกันในแนว Y มากพอหรือไม่
+        // ถ้าอยู่แถวเดียวกัน = มีโอกาสเป็นโต๊ะติดกันแนวนอน
+        const verticalOverlap =
+            Math.min(candidateRect.bottom, selectedRect.bottom) -
+            Math.max(candidateRect.top, selectedRect.top);
+
+        const minHeight = Math.min(
+            candidateRect.height,
+            selectedRect.height
+        );
+
+        const sameRow =
+            verticalOverlap > minHeight * 0.5;
+
+        if (!sameRow) {
+            return false;
+        }
+
+        // ระยะห่างระหว่างโต๊ะในแนว X
+        const horizontalGap =
+            Math.max(
+                selectedRect.left - candidateRect.right,
+                candidateRect.left - selectedRect.right,
+                0
+            );
+
+        // อนุโลมช่องว่างเล็กน้อยจากการจัดตำแหน่ง
+        const ADJACENT_GAP = 15;
+
+        return horizontalGap <= ADJACENT_GAP;
+    });
+}
 // --- ระบบผังโต๊ะหน้าแรก (User Mode) ---
 async function renderMainPageLayout() {
     const seatGrid = document.getElementById('main-seat-grid');
@@ -433,12 +480,17 @@ async function renderMainPageLayout() {
                     <span style="font-size: 0.65rem; font-weight: bold; line-height: 1; color: #fff !important; white-space: nowrap;">${escapeHtml(tableCode)}</span>
                     <span style="font-size: 0.48rem; line-height: 1; margin-top: 3px; color: #fff !important; opacity: 0.9; white-space: nowrap;">เข้างานแล้ว</span>
                 `;
-            } else {
-                if (item.color && !isReserved) {
-                    btn.style.backgroundColor = item.color;
-                }
-                btn.innerHTML = `<span style="font-size: 0.75rem; font-weight: bold; line-height: 1;">${escapeHtml(tableCode)}</span>`;
-            }
+          } else {
+    // 🟠 โต๊ะที่รอตรวจสอบสลิป = สีส้ม
+    if (item.booking_status === 'pending') {
+        btn.style.setProperty('background-color', '#e74c3c', 'important');
+        btn.style.setProperty('color', '#ffffff', 'important');
+    } else if (item.color && !isReserved) {
+        btn.style.backgroundColor = item.color;
+    }
+
+    btn.innerHTML = `<span style="font-size: 0.75rem; font-weight: bold; line-height: 1;">${escapeHtml(tableCode)}</span>`;
+}
 
             btn.addEventListener('mouseenter', () => {
                 if (!tooltip) return;
@@ -463,18 +515,44 @@ async function renderMainPageLayout() {
             });
             btn.addEventListener('mouseleave', () => { if (tooltip) tooltip.style.display = 'none'; });
 
-            if (!isReserved) {
-                btn.addEventListener('click', () => {
-                    if (btn.classList.contains('selected')) {
-                        btn.classList.remove('selected');
-                        selectedTables = selectedTables.filter(id => id !== tableCode);
-                    } else {
-                        btn.classList.add('selected');
-                        selectedTables.push(tableCode);
-                    }
-                    updateSelectionSummary();
-                });
-            }
+           if (!isReserved) {
+    btn.addEventListener('click', () => {
+
+        // =================================================
+        // กรณีคลิกโต๊ะที่เลือกอยู่แล้ว = ยกเลิกการเลือก
+        // =================================================
+        if (btn.classList.contains('selected')) {
+            btn.classList.remove('selected');
+
+            selectedTables = selectedTables.filter(
+                id => id !== tableCode
+            );
+
+            updateSelectionSummary();
+            return;
+        }
+
+        // =================================================
+        // 🚫 ป้องกันการเลือกโต๊ะที่ติดกันในแนวนอน
+        // =================================================
+        if (isHorizontalAdjacentTable(btn)) {
+            alert(
+                `⚠️ ไม่สามารถเลือกโต๊ะ ${tableCode} ได้\n\n` +
+                `โต๊ะนี้อยู่ติดกับโต๊ะที่คุณเลือกอยู่ในแนวนอน\n` +
+                `กรุณาเลือกโต๊ะด้านบนหรือด้านล่างแทนครับ`
+            );
+            return;
+        }
+
+        // =================================================
+        // เลือกโต๊ะตามปกติ
+        // =================================================
+        btn.classList.add('selected');
+        selectedTables.push(tableCode);
+
+        updateSelectionSummary();
+    });
+}
 
             seatGrid.appendChild(btn);
         }
@@ -1005,7 +1083,7 @@ function addAdminTable() {
     const price = prices[type] || '1,000฿';
 
     let defaultColor = '#3498db';
-    if (type === 'vip') defaultColor = '#e74c3c';
+   if (type === 'vip') defaultColor = '#0000FF';
     if (type === 'general') defaultColor = '#2ecc71';
 
     const table = document.createElement('div');
@@ -2010,7 +2088,7 @@ function renderInspectLayout() {
             let statusText = isCheckedIn ? 'เข้างานแล้ว' : (isBooked ? 'จองแล้ว (รอเข้างาน)' : 'ว่าง');
 
             el.style.backgroundColor = finalBg;
-            el.style.borderRadius = itemRadius || (isVIP ? '50%' : '10px');
+            el.style.borderRadius = itemRadius || '10px';
             el.style.display = 'flex'; el.style.flexDirection = 'column';
             el.style.alignItems = 'center'; el.style.justifyContent = 'center';
             el.style.cursor = 'pointer'; el.style.zIndex = '10'; el.style.padding = '2px';
