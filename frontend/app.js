@@ -619,14 +619,16 @@ async function renderMainPageLayout() {
         // =================================================
         // 🚫 ป้องกันการเลือกโต๊ะที่ติดกันในแนวนอน
         // =================================================
-        if (isHorizontalAdjacentTable(btn)) {
-            alert(
-                `⚠️ ไม่สามารถเลือกโต๊ะ ${tableCode} ได้\n\n` +
-                `โต๊ะนี้อยู่ติดกับโต๊ะที่คุณเลือกอยู่ในแนวนอน\n` +
-                `กรุณาเลือกโต๊ะด้านบนหรือด้านล่างแทนครับ`
-            );
-            return;
-        }
+       if (isHorizontalAdjacentTable(btn)) {
+
+    showTableWarning(
+        `ไม่สามารถเลือกโต๊ะ ${tableCode} ได้<br>` +
+        `โต๊ะนี้อยู่ติดกับโต๊ะที่คุณเลือกอยู่ในแนวนอน<br>` +
+        `กรุณาเลือกโต๊ะด้านบนหรือด้านล่างแทนครับ`
+    );
+
+    return;
+}
 
         // =================================================
         // เลือกโต๊ะตามปกติ
@@ -647,7 +649,60 @@ async function renderMainPageLayout() {
     // ค่อยวัดขนาด ไม่งั้นบางครั้งจะวัดค่าไม่ครบ (เจอปัญหานี้พอดี - บางรอบโหลดได้ครบ บางรอบไม่ครบ)
     requestAnimationFrame(() => fitCanvasToScreen('main-seat-grid'));
 }
+function showTableWarning(message) {
 
+    // ลบข้อความเดิมก่อน
+    const oldWarning = document.getElementById('table-selection-warning');
+
+    if (oldWarning) {
+        oldWarning.remove();
+    }
+
+    const warning = document.createElement('div');
+
+    warning.id = 'table-selection-warning';
+
+    warning.innerHTML = `
+        <div style="
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        ">
+            ⚠️ ไม่สามารถเลือกโต๊ะนี้ได้
+        </div>
+
+        <div style="
+            font-size: 15px;
+            line-height: 1.6;
+        ">
+            ${message}
+        </div>
+    `;
+
+    Object.assign(warning.style, {
+        position: 'fixed',
+        left: '50%',
+        bottom: '30px',
+        transform: 'translateX(-50%)',
+        zIndex: '999999',
+        width: 'min(90vw, 420px)',
+        boxSizing: 'border-box',
+        padding: '16px 20px',
+        background: '#e74c3c',
+        color: '#ffffff',
+        borderRadius: '14px',
+        textAlign: 'center',
+        boxShadow: '0 6px 25px rgba(0,0,0,0.3)',
+        fontFamily: 'inherit'
+    });
+
+    document.body.appendChild(warning);
+
+    // แสดง 2.5 วินาที
+    setTimeout(() => {
+        warning.remove();
+    }, 2500);
+}
 // อัปเดตยอดรวม "เลือกแล้ว X โต๊ะ | รวม Y บาท" ที่แสดงเหนือปุ่มยืนยัน (คำนวณสดทุกครั้งที่เลือก/ยกเลิกโต๊ะ)
 function updateSelectionSummary() {
     const el = document.getElementById('selection-summary');
