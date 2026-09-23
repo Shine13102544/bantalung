@@ -423,22 +423,29 @@ async function renderMainPageLayout() {
 
             btn.disabled = isReserved;
 
-            if (isCheckedIn) {
-                btn.style.setProperty('background-color', '#2ecc71', 'important');
-                btn.style.setProperty('color', '#ffffff', 'important');
-                btn.style.setProperty('opacity', '1', 'important');
-                btn.style.setProperty('border', 'none', 'important');
-                
-                btn.innerHTML = `
-                    <span style="font-size: 0.65rem; font-weight: bold; line-height: 1; color: #fff !important; white-space: nowrap;">${escapeHtml(tableCode)}</span>
-                    <span style="font-size: 0.48rem; line-height: 1; margin-top: 3px; color: #fff !important; opacity: 0.9; white-space: nowrap;">เข้างานแล้ว</span>
-                `;
-            } else {
-                if (item.color && !isReserved) {
-                    btn.style.backgroundColor = item.color;
-                }
-                btn.innerHTML = `<span style="font-size: 0.75rem; font-weight: bold; line-height: 1;">${escapeHtml(tableCode)}</span>`;
-            }
+          if (isCheckedIn) { 
+    btn.style.setProperty('background-color', '#2ecc71', 'important'); 
+    btn.style.setProperty('color', '#ffffff', 'important'); 
+    btn.style.setProperty('opacity', '1', 'important'); 
+    btn.style.setProperty('border', 'none', 'important'); 
+     
+    btn.innerHTML = ` 
+        <span style="font-size: 0.65rem; font-weight: bold; line-height: 1; color: #fff !important; white-space: nowrap;">${escapeHtml(tableCode)}</span> 
+        <span style="font-size: 0.48rem; line-height: 1; margin-top: 3px; color: #fff !important; opacity: 0.9; white-space: nowrap;">เข้างานแล้ว</span> 
+    `; 
+
+} else { 
+
+    // 🟠 โต๊ะที่กำลังตรวจสอบสลิป
+    if (item.booking_status === 'pending') {
+        btn.style.setProperty('background-color', '#f39c12', 'important');
+    } else if (item.color && !isReserved) { 
+        // สีเดิมของโต๊ะว่าง
+        btn.style.backgroundColor = item.color; 
+    } 
+
+    btn.innerHTML = `<span style="font-size: 0.75rem; font-weight: bold; line-height: 1;">${escapeHtml(tableCode)}</span>`; 
+}
 
             btn.addEventListener('mouseenter', () => {
                 if (!tooltip) return;
@@ -464,17 +471,45 @@ async function renderMainPageLayout() {
             btn.addEventListener('mouseleave', () => { if (tooltip) tooltip.style.display = 'none'; });
 
             if (!isReserved) {
-                btn.addEventListener('click', () => {
-                    if (btn.classList.contains('selected')) {
-                        btn.classList.remove('selected');
-                        selectedTables = selectedTables.filter(id => id !== tableCode);
-                    } else {
-                        btn.classList.add('selected');
-                        selectedTables.push(tableCode);
-                    }
-                    updateSelectionSummary();
-                });
-            }
+    btn.addEventListener('click', () => {
+
+        // ถ้ากดโต๊ะที่เลือกอยู่แล้ว = ยกเลิกการเลือก
+        if (btn.classList.contains('selected')) {
+
+            btn.classList.remove('selected');
+
+            selectedTables = selectedTables.filter(
+                id => id !== tableCode
+            );
+
+            updateSelectionSummary();
+            return;
+        }
+
+        // ==================================================
+        // ตรวจสอบก่อนเลือกโต๊ะใหม่
+        // ห้ามเลือกโต๊ะที่ติดกันในแนวนอน
+        // ==================================================
+        if (isHorizontalAdjacentTable(tableCode)) {
+
+            alert(
+                '⚠️ ไม่สามารถจองโต๊ะติดกันในแนวนอนได้\n\n' +
+                'หากต้องการต่อโต๊ะรวมเป็นโต๊ะเดียว สามารถต่อได้เฉพาะแนวตั้งเท่านั้น\n\n' +
+                'หากต้องการจองโต๊ะที่ติดกันในแนวนอน กรุณาจองแยกเป็นรายการใหม่อีกครั้ง แต่โต๊ะจะไม่สามารถนำมาต่อรวมกันได้'
+            );
+
+            return;
+        }
+
+        // ==================================================
+        // ผ่านเงื่อนไข → เลือกโต๊ะได้
+        // ==================================================
+        btn.classList.add('selected');
+        selectedTables.push(tableCode);
+
+        updateSelectionSummary();
+    });
+}
 
             seatGrid.appendChild(btn);
         }
@@ -486,18 +521,73 @@ async function renderMainPageLayout() {
     requestAnimationFrame(() => fitCanvasToScreen('main-seat-grid'));
 }
 
-// อัปเดตยอดรวม "เลือกแล้ว X โต๊ะ | รวม Y บาท" ที่แสดงเหนือปุ่มยืนยัน (คำนวณสดทุกครั้งที่เลือก/ยกเลิกโต๊ะ)
-function updateSelectionSummary() {
-    const el = document.getElementById('selection-summary');
-    if (!el) return;
+// ======================================================
+// ตรวจสอบการเลือกโต๊ะติดกันในแนวนอน
+// กติกา:
+// - โต๊ะที่ไม่ติดกัน เลือกได้
+// - โต๊ะที่ติดกันในแนวตั้ง เลือกได้
+// - โต๊ะที่ติดกันในแนวนอน ห้ามเลือกในการจองเดียวกัน
+// ======================================================
+function isHorizontalAdjacentTable(tableCode) {
+    const candidate = layoutData.find(
+        i => i.kind === 'table' && i.table_code === tableCode
+    );
 
-    let total = 0;
-    selectedTables.forEach(code => {
-        const item = layoutData.find(i => i.kind === 'table' && i.table_code === code);
-        if (item) total += parsePrice(item.price);
+    if (!candidate) return false;
+
+    const getNumber = (value) => {
+        const n = parseFloat(String(value || '').replace('px', ''));
+        return Number.isFinite(n) ? n : 0;
+    };
+
+    const candidateLeft = getNumber(candidate.pos_left);
+    const candidateTop = getNumber(candidate.pos_top);
+    const candidateWidth = getNumber(candidate.width);
+    const candidateHeight = getNumber(candidate.height);
+
+    const candidateRight = candidateLeft + candidateWidth;
+    const candidateBottom = candidateTop + candidateHeight;
+
+    // ตรวจเฉพาะโต๊ะที่เลือกไว้แล้ว
+    return selectedTables.some(selectedCode => {
+
+        const selected = layoutData.find(
+            i => i.kind === 'table' && i.table_code === selectedCode
+        );
+
+        if (!selected) return false;
+
+        const selectedLeft = getNumber(selected.pos_left);
+        const selectedTop = getNumber(selected.pos_top);
+        const selectedWidth = getNumber(selected.width);
+        const selectedHeight = getNumber(selected.height);
+
+        const selectedRight = selectedLeft + selectedWidth;
+        const selectedBottom = selectedTop + selectedHeight;
+
+        // ต้องอยู่ในแถวเดียวกันในแนวตั้ง
+        const verticalOverlap =
+            Math.min(candidateBottom, selectedBottom) -
+            Math.max(candidateTop, selectedTop);
+
+        const sameRow =
+            verticalOverlap > Math.min(candidateHeight, selectedHeight) * 0.5;
+
+        if (!sameRow) return false;
+
+        // ระยะห่างแนวนอนระหว่างโต๊ะ
+        const horizontalGap = Math.max(
+            selectedLeft - candidateRight,
+            candidateLeft - selectedRight,
+            0
+        );
+
+        // ถ้าอยู่ติดกันในแนวนอน
+        // รองรับช่องว่างเล็กน้อยจากการจัดผัง
+        const ADJACENT_GAP = 15;
+
+        return horizontalGap <= ADJACENT_GAP;
     });
-
-    el.textContent = `เลือกแล้ว ${selectedTables.length} โต๊ะ | รวม ${total.toLocaleString('th-TH')} บาท`;
 }
 
 // --- สรุปจำนวนโต๊ะคงเหลือแยกตามโซน (หน้าแรก - ดูอย่างเดียว กดจองไม่ได้) ---
