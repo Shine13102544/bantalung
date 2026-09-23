@@ -317,18 +317,29 @@ function isHorizontalAdjacentTable(candidateBtn) {
     const candidateRect = candidateBtn.getBoundingClientRect();
 
     const selectedButtons = document.querySelectorAll(
-    '.table-btn.selected'
-);
+        '.table-btn.selected'
+    );
+
+    const allTables = Array.from(
+        document.querySelectorAll('.table-btn')
+    );
 
     return Array.from(selectedButtons).some(selectedBtn => {
 
         const selectedRect = selectedBtn.getBoundingClientRect();
 
-        // ตรวจว่ามีการซ้อนกันในแนว Y มากพอหรือไม่
-        // ถ้าอยู่แถวเดียวกัน = มีโอกาสเป็นโต๊ะติดกันแนวนอน
+        // =================================================
+        // 1. ตรวจว่าโต๊ะอยู่แถวเดียวกันหรือไม่
+        // =================================================
         const verticalOverlap =
-            Math.min(candidateRect.bottom, selectedRect.bottom) -
-            Math.max(candidateRect.top, selectedRect.top);
+            Math.min(
+                candidateRect.bottom,
+                selectedRect.bottom
+            ) -
+            Math.max(
+                candidateRect.top,
+                selectedRect.top
+            );
 
         const minHeight = Math.min(
             candidateRect.height,
@@ -338,22 +349,95 @@ function isHorizontalAdjacentTable(candidateBtn) {
         const sameRow =
             verticalOverlap > minHeight * 0.5;
 
+        // ถ้าไม่ได้อยู่แถวเดียวกัน = อนุญาต
         if (!sameRow) {
             return false;
         }
 
-        // ระยะห่างระหว่างโต๊ะในแนว X
-        const horizontalGap =
-            Math.max(
-                selectedRect.left - candidateRect.right,
-                candidateRect.left - selectedRect.right,
-                0
-            );
+        // =================================================
+        // 2. ตรวจว่า candidate อยู่ซ้ายหรือขวาของโต๊ะที่เลือก
+        // =================================================
+        const candidateCenter =
+            candidateRect.left + candidateRect.width / 2;
 
-        // อนุโลมช่องว่างเล็กน้อยจากการจัดตำแหน่ง
-        const ADJACENT_GAP = 15;
+        const selectedCenter =
+            selectedRect.left + selectedRect.width / 2;
 
-        return horizontalGap <= ADJACENT_GAP;
+        const isCandidateRight =
+            candidateCenter > selectedCenter;
+
+        // =================================================
+        // 3. หาโต๊ะทุกตัวที่อยู่แถวเดียวกัน
+        // =================================================
+        const sameRowTables = allTables
+            .filter(table => table !== candidateBtn)
+            .filter(table => table !== selectedBtn)
+            .map(table => ({
+                element: table,
+                rect: table.getBoundingClientRect()
+            }))
+            .filter(item => {
+
+                const rect = item.rect;
+
+                const overlap =
+                    Math.min(
+                        candidateRect.bottom,
+                        rect.bottom
+                    ) -
+                    Math.max(
+                        candidateRect.top,
+                        rect.top
+                    );
+
+                const height =
+                    Math.min(
+                        candidateRect.height,
+                        rect.height
+                    );
+
+                return overlap > height * 0.5;
+            });
+
+        // =================================================
+        // 4. ตรวจว่ามีโต๊ะอื่นคั่นระหว่าง 2 โต๊ะหรือไม่
+        // =================================================
+        const tableBetween = sameRowTables.some(item => {
+
+            const rect = item.rect;
+
+            const center =
+                rect.left + rect.width / 2;
+
+            if (isCandidateRight) {
+
+                return (
+                    center > selectedCenter &&
+                    center < candidateCenter
+                );
+
+            } else {
+
+                return (
+                    center < selectedCenter &&
+                    center > candidateCenter
+                );
+            }
+        });
+
+        // =================================================
+        // ถ้ามีโต๊ะคั่นกลาง = ไม่ถือว่าติดกัน
+        // สามารถเลือกได้
+        // =================================================
+        if (tableBetween) {
+            return false;
+        }
+
+        // =================================================
+        // ไม่มีโต๊ะคั่นกลาง = ติดกันแนวนอน
+        // ห้ามเลือก
+        // =================================================
+        return true;
     });
 }
 // --- ระบบผังโต๊ะหน้าแรก (User Mode) ---
