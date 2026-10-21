@@ -1,8 +1,11 @@
 // โหลด .env จาก backend/.env เสมอ (npm start รันจากโฟลเดอร์ root จึงอ่านไฟล์ที่ cwd ไม่เจอ)
 // แล้วลองโหลด .env ที่ cwd ซ้ำอีกครั้ง (ไม่ทับค่าที่ตั้งไว้แล้ว) เผื่อคุณวางไว้ที่ root
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-require('dotenv').config();
+// โหลด .env เฉพาะเมื่อรันในเครื่อง (ไม่โหลดเมื่ออยู่บน Vercel / Production)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+    require('dotenv').config();
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -46,7 +49,13 @@ app.use(helmet({
 // ตอนพัฒนาในเครื่องที่หน้าเว็บอยู่คนละพอร์ต ให้ตั้ง FRONTEND_ORIGIN ใน .env (ไม่มีค่าเริ่มต้นเป็น * อีกแล้ว)
 const allowedOrigins = (process.env.FRONTEND_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+    origin: (origin, callback) => {
+        // อนุญาตถ้าไม่มี origin (เช่น same-domain/serverless) หรืออยู่อยู่ใน allowedOrigins หรือรันบน vercel.app
+        if (!origin || allowedOrigins.includes(origin) || (process.env.VERCEL && origin.endsWith('.vercel.app'))) {
+            return callback(null, true);
+        }
+        callback(null, false);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 }));
 
